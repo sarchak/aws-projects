@@ -1,0 +1,13 @@
+Pipfile.lock
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.so
+
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
