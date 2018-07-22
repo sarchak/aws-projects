@@ -7,4 +7,5 @@ This project will help us to upload a local directory to s3 bucket and configure
 
    * List buckets
    * List files in a particular bucket
-
+   * Setup bucket for deployment
+   * Sync directory tree
