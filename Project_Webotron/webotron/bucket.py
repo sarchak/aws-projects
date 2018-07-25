@@ -2,6 +2,7 @@
 from botocore.exceptions import ClientError
 import mimetypes
 from pathlib import Path
+import util
 
 """ Class for s3 buckets."""
 class BucketManager: 
@@ -14,6 +15,13 @@ class BucketManager:
         """Get an iterator for all buckets."""
         return self.s3.buckets.all()
 
+    def get_region_name(self, bucket):
+        bucket_location = self.s3.meta.client.get_bucket_location(Bucket=bucket.name)
+        return bucket_location["LocationConstraint"] or 'us-east-1'
+
+    def get_bucket_url(self, bucket):
+        return "http://{}.{}".format(bucket.name, util.get_endpoint(self.get_region_name(bucket)).host)
+         
     def all_objects(self, bucket):
         """Get an iterator for all files"""
         return self.s3.Bucket(bucket).objects.all()
@@ -70,5 +78,5 @@ class BucketManager:
                 if p.is_file():
                     print("Path: {} \t Key: {}".format(p, p.relative_to(root)))
                     self.upload_file(bucket, str(p), str(p.relative_to(root)))
-
+    
         handle_directory(root)
