@@ -46,7 +46,9 @@ class BucketManager:
                 raise(e)
         return bucket
 
-
+    def get_bucket(self, bucket_name):
+        return self.s3.Bucket(bucket_name)
+        
     def set_policy(self, bucket):
         policy = """
         {
