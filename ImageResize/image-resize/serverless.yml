@@ -1,0 +1,83 @@
+service: image-resize
+    
+provider:
+  name: aws
+  runtime: python3.6
+  stage: dev
+  iamRoleStatements:    
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+        - "s3:PutObject"
+        - "s3:PutObjectAcl"
+      Resource:
+        - Fn::Join:
+          - ''
+          - - ${self:custom.appBucketArn}
+            - '/*'   
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+      Resource:
+        Fn::GetAtt:
+          - appTable
+          - Arn  
+  environment:
+    SLACK_CLIENT_ID: ${file(../config/config.${self:provider.stage}.json):slack.CLIENT_ID}
+    SLACK_CLIENT_SECRET: ${file(../config/config.${self:provider.stage}.json):slack.CLIENT_SECRET}
+    DYNAMODB_TABLE_NAME: ${self:custom.appTableName}
+    APP_BUCKET: ${self:custom.appBucketName}
+
+plugins:
+  - serverless-python-requirements
+
+functions:
+  authorization:
+    handler: handler.authorization
+    events:
+      - http:
+          method: get
+          path: slack/authorization
+  resize:
+    handler: handler.resize
+    events:
+      - http:
+          method: post
+          path: slack/resize
+
+
+resources:
+  Resources:
+    resized:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.appBucketName}
+    appTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.appTableName}
+        AttributeDefinitions:          
+          - AttributeName: team_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: team_id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+  appTableName: ${file(../config/config.${self:provider.stage}.json):app.table_name}-${self:provider.stage}
+  appBucketName: ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
+  appBucketArn:
+      Fn::Join:
+        - ':'
+        - - arn
+          - aws
+          - s3
+          - ''
+          - ''
+          - ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
