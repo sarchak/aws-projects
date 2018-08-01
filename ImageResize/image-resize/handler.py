@@ -8,6 +8,43 @@ import PIL
 from PIL import Image
 from io import BytesIO
 
+IMAGE_SIZES = {
+    'facebook': {
+        'profile': (180,180),
+        'cover': (851,310),
+        'fanpage': (851,312) ,
+        'group': (820,428),
+        'event': (500,262),
+        'posts': (1200,630)
+    },
+    'instagram': {
+        'profile': (150,150),
+        'share_square': (1080,1080),
+        'share_vertical': (1080,1350),
+        'share_horizontal': (1080,566)
+    },
+    'twitter': {
+        'profile': (200,200),
+        'cover': (1500,1500),
+        'share': (1024,512)
+    },
+    'google+': {
+        'profile': (250,250),
+        'cover': (968,545),
+        'share': (502,282)
+    },
+    'linkedin': {
+        'profile': (400,400),
+        'cover': (1584,396),
+        'posts': (520,320)
+    },
+    'pinterest': {
+        'profile': (165,165),
+        'pin': (236,600),
+        'board': (222,150)
+    }
+}
+
 def resize(event, context):  
     pprint(event)
     payload = parse_qs(event['body'])    
@@ -28,36 +65,35 @@ def resize(event, context):
 
 def resize_helper(payload):  
     s3 = boto3.resource('s3')
-    destination_bucket = os.environ['APP_BUCKET']
-    object_key = "shrek.jpeg"
-    # Uploading the image
-    obj = s3.Object(
-        bucket_name=destination_bucket,
-        key=object_key,
-    )    
-    size = 320,320
-    r = requests.get('https://i.redd.it/lo1s5x1owyc11.jpg')
-    img = Image.open(BytesIO(r.content))
-    img.thumbnail(size)
-    buffer = BytesIO()
-    img.save(buffer, 'JPEG')
-    buffer.seek(0)
+    destination_bucket = os.environ['APP_BUCKET']    
+    if payload['submission']['image_platform'] == 'all':
+        print("Wowwwww!")
+    else:
+        data = IMAGE_SIZES[payload['submission']['image_platform']]
+        for img_type, size in data.items():
+            object_key = "shrek_{}_{}.jpeg".format(payload['submission']['image_platform'], img_type)
+            # Uploading the image
+            obj = s3.Object(
+                bucket_name=destination_bucket,
+                key=object_key,
+            )    
 
-    
-    obj.put(ACL='public-read', Body=buffer)
-    
-    post_to_slack(payload, destination_bucket, object_key)
-    response = {
-        "statusCode": 200,
-        "body": "resize called"
-    }
+            r = requests.get('https://i.redd.it/lo1s5x1owyc11.jpg')
+            img = Image.open(BytesIO(r.content))
+            # img.thumbnail(size)
+            print("Resizing the image to : {}".format(size))
+            img = img.resize(size)
+            buffer = BytesIO()
+            img.save(buffer, 'JPEG')
+            buffer.seek(0)            
+            obj.put(ACL='public-read', Body=buffer)            
+            post_to_slack(payload, destination_bucket, object_key)    
 
-
-    # Printing to CloudWatch
-    print('File saved at {}/{}'.format(
-        destination_bucket,
-        object_key,
-    ))
+            # Printing to CloudWatch
+            print('File saved at {}/{}'.format(
+                destination_bucket,
+                object_key,
+            ))
 
 
 
@@ -167,6 +203,10 @@ def open_dialog(payload):
                 "type": "select",
                 "name": "image_platform",
                 "options": [
+                    {
+                    "label": "All",
+                    "value": "all"
+                    },
                     {
                     "label": "Facebook",
                     "value": "facebook"
