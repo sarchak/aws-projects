@@ -7,7 +7,8 @@ from urllib.parse import urlsplit, parse_qs
 import PIL
 from PIL import Image
 from io import BytesIO
-
+from concurrent.futures import ThreadPoolExecutor
+from concurrent import futures
 IMAGE_SIZES = {
     'facebook': {
         'profile': (180,180),
@@ -40,7 +41,7 @@ IMAGE_SIZES = {
     },
     'pinterest': {
         'profile': (165,165),
-        'pin': (236,600),
+        'pin': (236,450),
         'board': (222,150)
     }
 }
@@ -63,6 +64,32 @@ def resize(event, context):
     }        
     return response
 
+def resizer(payload, destination_bucket, object_key, size):
+    s3 = boto3.resource('s3')
+    r = requests.get('https://i.redd.it/lo1s5x1owyc11.jpg')
+    img = Image.open(BytesIO(r.content))
+
+    obj = s3.Object(
+            bucket_name=destination_bucket,
+            key=object_key,
+        )    
+    
+    # img.thumbnail(size)
+    print("Resizing the image to : {}".format(size))
+    print(img)
+    img = img.resize(size)
+    buffer = BytesIO()
+    img.save(buffer, 'JPEG')
+    buffer.seek(0)            
+    obj.put(ACL='public-read', Body=buffer)            
+    post_to_slack(payload, destination_bucket, object_key)    
+
+    # Printing to CloudWatch
+    print('File saved at {}/{}'.format(
+        destination_bucket,
+        object_key,
+    ))
+
 def resize_helper(payload):  
     s3 = boto3.resource('s3')
     destination_bucket = os.environ['APP_BUCKET']    
@@ -70,31 +97,16 @@ def resize_helper(payload):
         print("Wowwwww!")
     else:
         data = IMAGE_SIZES[payload['submission']['image_platform']]
-        for img_type, size in data.items():
-            object_key = "shrek_{}_{}.jpeg".format(payload['submission']['image_platform'], img_type)
-            # Uploading the image
-            obj = s3.Object(
-                bucket_name=destination_bucket,
-                key=object_key,
-            )    
-
-            r = requests.get('https://i.redd.it/lo1s5x1owyc11.jpg')
-            img = Image.open(BytesIO(r.content))
-            # img.thumbnail(size)
-            print("Resizing the image to : {}".format(size))
-            img = img.resize(size)
-            buffer = BytesIO()
-            img.save(buffer, 'JPEG')
-            buffer.seek(0)            
-            obj.put(ACL='public-read', Body=buffer)            
-            post_to_slack(payload, destination_bucket, object_key)    
-
-            # Printing to CloudWatch
-            print('File saved at {}/{}'.format(
-                destination_bucket,
-                object_key,
-            ))
-
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            processes = []
+            for img_type, size in data.items():
+                object_key = "shrek_{}_{}.jpeg".format(payload['submission']['image_platform'], img_type)
+                future = executor.submit(resizer, payload, destination_bucket, object_key, size)
+                processes.append(future)
+            for future in futures.as_completed(processes):
+                res = future.result()
+    
 
 
 def make_item(data):
