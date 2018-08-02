@@ -7,8 +7,9 @@ from urllib.parse import urlsplit, parse_qs
 import PIL
 from PIL import Image
 from io import BytesIO
-from concurrent.futures import ThreadPoolExecutor
-from concurrent import futures
+from slack_helper import open_dialog, send_ephemeral_message
+import uuid
+
 IMAGE_SIZES = {
     'facebook': {
         'profile': (180,180),
@@ -46,68 +47,75 @@ IMAGE_SIZES = {
     }
 }
 
-def resize(event, context):  
-    pprint(event)
-    payload = parse_qs(event['body'])    
+def resize(event, context):
+    payload = parse_qs(event['body'])
     payload = payload['payload'][0]
-
-    print("*****************")
     payload = json.loads(payload)
+
+    print(json.dumps(payload, indent=4, sort_keys=True))
+    image_url = None
+
+    if "message" in payload:
+        print("Payload : {}".format(payload["message"]["files"][0]["url_private"]))
+        print("Keys: ", payload["message"]["files"][0].keys())
+        image_url = payload["message"]["files"][0]["url_private"]
+
+    dynamodb = boto3.resource('dynamodb')
+    table_name = os.environ['DYNAMODB_TABLE_NAME']
+    app_table = dynamodb.Table(table_name)
+    item = app_table.get_item(TableName=table_name, Key={'team_id':payload['team']['id']})
+    token = item['Item']['access_token']
+    response_url = payload['response_url']
+    platform = None
+    channel_id = payload['user']['id']
+
     if(payload['type'] == 'message_action'):
-        open_dialog(payload)
+        trigger_id = payload['trigger_id']
+        callback_id = str(uuid.uuid4())
+        write_to_db({"callback_id": callback_id, "image_url": image_url}, table_name='CACHE_TABLE_NAME')
+        open_dialog(token, trigger_id, callback_id)
+        print("*** Image url : {}".format(image_url))
     else:
-        handle_submission(payload)  
+        platform = payload['submission']['image_platform']
+        table_name = os.environ['CACHE_TABLE_NAME']
+        item = app_table.get_item(TableName=table_name, Key={'callback_id':payload['callback_id']})
+        image_url = item['Item']['image_url']
+        print("*** Post submission Image url : {}".format(image_url))
+        handle_submission(token, response_url, platform, channel_id, image_url)
 
     response = {
         "statusCode": 200,
         "body": ""
-    }        
+    }
     return response
 
-def resizer(payload, destination_bucket, object_key, size):
-    s3 = boto3.resource('s3')
-    r = requests.get('https://i.redd.it/lo1s5x1owyc11.jpg')
-    img = Image.open(BytesIO(r.content))
+def handle_submission(token, post_url, platform, channel_id, image_url):
+    print("***** Submission Accepted ******")
+    send_ephemeral_message(token, post_url, "We will send the resized images soon..")
+    resize_helper(platform, channel_id, token, image_url)
 
-    obj = s3.Object(
-            bucket_name=destination_bucket,
-            key=object_key,
-        )    
-    
-    # img.thumbnail(size)
-    print("Resizing the image to : {}".format(size))
-    print(img)
-    img = img.resize(size)
-    buffer = BytesIO()
-    img.save(buffer, 'JPEG')
-    buffer.seek(0)            
-    obj.put(ACL='public-read', Body=buffer)            
-    post_to_slack(payload, destination_bucket, object_key)    
 
-    # Printing to CloudWatch
-    print('File saved at {}/{}'.format(
-        destination_bucket,
-        object_key,
-    ))
-
-def resize_helper(payload):  
-    s3 = boto3.resource('s3')
-    destination_bucket = os.environ['APP_BUCKET']    
-    if payload['submission']['image_platform'] == 'all':
+def resize_helper(platform, channel_id, token, image_url):
+    sns = boto3.resource('sns')
+    destination_bucket = os.environ['APP_BUCKET']
+    if platform == 'all':
         print("Wowwwww!")
     else:
-        data = IMAGE_SIZES[payload['submission']['image_platform']]
-        
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            processes = []
-            for img_type, size in data.items():
-                object_key = "shrek_{}_{}.jpeg".format(payload['submission']['image_platform'], img_type)
-                future = executor.submit(resizer, payload, destination_bucket, object_key, size)
-                processes.append(future)
-            for future in futures.as_completed(processes):
-                res = future.result()
-    
-
+        data = IMAGE_SIZES[platform]
+        for img_type, size in data.items():
+            object_key = "shrek_{}_{}.jpeg".format(platform, img_type)
+            sns = boto3.client('sns')
+            params = {
+                "bucket": destination_bucket,
+                "object_key": object_key,
+                "platform": platform,
+                "channel_id": channel_id,
+                "size": size,
+                "token": token,
+                "image_url": image_url
+            }
+            topic_arn = os.environ['SNS_TOPIC_ARN']
+            sns.publish(TopicArn= topic_arn, Message= json.dumps(params))
 
 def make_item(data):
     if isinstance(data, dict):
@@ -121,162 +129,27 @@ def make_item(data):
 
     return data
 
-def send_message(payload, message):
+
+def write_to_db(data, table_name='DYNAMODB_TABLE_NAME'):
     dynamodb = boto3.resource('dynamodb')
-    table_name = os.environ['DYNAMODB_TABLE_NAME']
-    app_table = dynamodb.Table(table_name)
-    item = app_table.get_item(TableName=table_name, Key={'team_id':payload['team']['id']})
-    token = item['Item']['access_token']
-    pprint("Token : {}".format(token))
-
-    # url = 'https://slack.com//api/chat.postMessage'     
-    headers = {
-        'Authorization': 'Bearer {}'.format(token)
-    }
-    # data =  {
-    #     "text": message,
-    #     "channel": payload['user']['id']
-    # }
-    # requests.post(url, headers=headers, json=data)
-
-    data = {
-          "text": "We will be sending the processed images soon...",
-          "attachments": [
-              {
-                  "text":"Platform: {}".format(payload['submission']['image_platform'])
-              }
-          ],
-          "response_type": "ephemeral"
-      }
-    print("Sending message:!!!!")
-    r = requests.post(payload['response_url'], headers=headers, json=data)
-    print(r.content)
-    
-def post_to_slack(payload, destination_bucket, object_key):    
-    dynamodb = boto3.resource('dynamodb')
-    table_name = os.environ['DYNAMODB_TABLE_NAME']
-    app_table = dynamodb.Table(table_name)
-    item = app_table.get_item(TableName=table_name, Key={'team_id':payload['team']['id']})
-    token = item['Item']['access_token']
-    pprint("Token : {}".format(token))
-
-    url = 'https://slack.com//api/chat.postMessage'     
-    headers = {
-        'Authorization': 'Bearer {}'.format(token)
-    }
-    data =  {
-        "text": "Thank you for using ImageResize.",
-        "attachments": [
-            {
-                "fallback": "Required plain-text summary of the attachment.",
-                "title": object_key,
-                "title_link": "https://api.slack.com/",
-                "text": "",
-                "image_url": "https://s3.amazonaws.com/{}/{}".format(destination_bucket, object_key),
-                "thumb_url": "https://s3.amazonaws.com/{}/{}".format(destination_bucket, object_key)
-            }
-        ],
-        "channel": payload['user']['id']
-    }
-    requests.post(url, headers=headers, json=data)
-    response = {
-        "statusCode": 200,
-        "body": "Submission successful"
-    }        
-
-    return response
-
-def handle_submission(payload):
-    print("***** Submission Accepted ******")
-    pprint(payload)
-    send_message(payload, "We will send the resized images soon..")
-    resize_helper(payload)        
-
-def open_dialog(payload):  
-    dynamodb = boto3.resource('dynamodb')
-    table_name = os.environ['DYNAMODB_TABLE_NAME']
-    app_table = dynamodb.Table(table_name)
-    item = app_table.get_item(TableName=table_name, Key={'team_id':payload['team']['id']})
-    token = item['Item']['access_token']
-    pprint("Token : {}".format(token))
-
-    url = 'https://slack.com//api/dialog.open'     
-    headers = {
-        'Authorization': 'Bearer {}'.format(token),
-        'Content-Type': 'application/json'
-    }
-    data =  {
-        "callback_id": "ryde-46e2b0",
-        "title": "Get Images Resized",
-        "submit_label": "Request",
-        "elements": [            
-            {
-                "label": "Select platforms",
-                "type": "select",
-                "name": "image_platform",
-                "options": [
-                    {
-                    "label": "All",
-                    "value": "all"
-                    },
-                    {
-                    "label": "Facebook",
-                    "value": "facebook"
-                    },
-                    {
-                    "label": "Instagram",
-                    "value": "instagram"
-                    },
-                    {
-                    "label": "Twitter",
-                    "value": "twitter"
-                    },
-                    {
-                    "label": "Google+",
-                    "value": "google"
-                    },
-                    {
-                    "label": "Linkedin",
-                    "value": "linkedin"
-                    },
-                    {
-                    "label": "Pinterest",
-                    "value": "pinterest"
-                    }
-                ]
-            }
-        ]
-        }
-    pdata = {
-        "token": token,
-        "trigger_id": payload['trigger_id'],
-        "dialog": data
-    }
-    pprint(pdata)
-    response = requests.post(url, headers=headers, json=pdata)
-    print(response.content)
-
-
-    
-def write_to_db(data):
-    dynamodb = boto3.resource('dynamodb')
-    table_name = os.environ['DYNAMODB_TABLE_NAME']
+    table_name = os.environ[table_name]
     app_table = dynamodb.Table(table_name)
     app_table.put_item(Item=data)
+
 
 def authorization(event, context):
     code = event['queryStringParameters']['code'];
     clientId = os.environ['SLACK_CLIENT_ID']
     clientSecret = os.environ['SLACK_CLIENT_SECRET']
 
-    oauthURL = 'https://slack.com/api/oauth.access?' + 'client_id='+clientId + '&' + 'client_secret='+clientSecret + '&' + 'code='+code;  
+    oauthURL = 'https://slack.com/api/oauth.access?' + 'client_id='+clientId + '&' + 'client_secret='+clientSecret + '&' + 'code='+code;
 
     #Authorize Slack
     data = requests.post(oauthURL)
     response = {
         "statusCode": 200,
         "body": "Successfully Authorized!"
-    }    
+    }
 
     #Store team id and token
     data = make_item(data.json())

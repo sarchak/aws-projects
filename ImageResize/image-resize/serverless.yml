@@ -1,10 +1,10 @@
 service: image-resize
-    
+
 provider:
   name: aws
   runtime: python3.6
   stage: dev
-  iamRoleStatements:    
+  iamRoleStatements:
     - Effect: "Allow"
       Action:
         - "s3:GetObject"
@@ -14,7 +14,7 @@ provider:
         - Fn::Join:
           - ''
           - - ${self:custom.appBucketArn}
-            - '/*'   
+            - '/*'
     - Effect: "Allow"
       Action:
         - "dynamodb:PutItem"
@@ -22,12 +22,28 @@ provider:
       Resource:
         Fn::GetAtt:
           - appTable
-          - Arn  
+          - Arn
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+      Resource:
+        Fn::GetAtt:
+          - cacheTable
+          - Arn
+    - Effect: "Allow"
+      Action:
+        - "sns:Publish"
+      Resource:
+        - ${self:custom.snsWorkerTopicArn}
+
   environment:
     SLACK_CLIENT_ID: ${file(../config/config.${self:provider.stage}.json):slack.CLIENT_ID}
     SLACK_CLIENT_SECRET: ${file(../config/config.${self:provider.stage}.json):slack.CLIENT_SECRET}
     DYNAMODB_TABLE_NAME: ${self:custom.appTableName}
+    CACHE_TABLE_NAME: ${self:custom.cacheTableName}
     APP_BUCKET: ${self:custom.appBucketName}
+    SNS_TOPIC_ARN: ${self:custom.snsWorkerTopicArn}
 
 plugins:
   - serverless-python-requirements
@@ -45,6 +61,12 @@ functions:
       - http:
           method: post
           path: slack/resize
+  image_resize:
+    handler: resizer.image_resize_worker
+    events:
+      - sns:
+          arn: ${self:custom.snsWorkerTopicArn}
+          topicName: ${self:custom.snsTopicName}
 
 
 resources:
@@ -53,15 +75,33 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:custom.appBucketName}
+    snsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:custom.snsTopicName}
+        DisplayName: Topic to distribute work
     appTable:
       Type: AWS::DynamoDB::Table
       Properties:
         TableName: ${self:custom.appTableName}
-        AttributeDefinitions:          
+        AttributeDefinitions:
           - AttributeName: team_id
             AttributeType: S
         KeySchema:
           - AttributeName: team_id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    cacheTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.cacheTableName}
+        AttributeDefinitions:
+          - AttributeName: callback_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: callback_id
             KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 1
@@ -72,6 +112,7 @@ custom:
     dockerizePip: true
   appTableName: ${file(../config/config.${self:provider.stage}.json):app.table_name}-${self:provider.stage}
   appBucketName: ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
+  cacheTableName: ${file(../config/config.${self:provider.stage}.json):app.cache_table_name}-${self:provider.stage}
   appBucketArn:
       Fn::Join:
         - ':'
@@ -81,3 +122,13 @@ custom:
           - ''
           - ''
           - ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
+  snsTopicName: sns-image-resize-topic-${self:provider.stage}
+  snsWorkerTopicArn:
+    Fn::Join:
+      - ":"
+      - - arn
+        - aws
+        - sns
+        - Ref: AWS::Region
+        - Ref: AWS::AccountId
+        - ${self:custom.snsTopicName}
