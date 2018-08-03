@@ -10,43 +10,6 @@ from io import BytesIO
 from slack_helper import open_dialog, send_ephemeral_message
 import uuid
 
-IMAGE_SIZES = {
-    'facebook': {
-        'profile': (180,180),
-        'cover': (851,310),
-        'fanpage': (851,312) ,
-        'group': (820,428),
-        'event': (500,262),
-        'posts': (1200,630)
-    },
-    'instagram': {
-        'profile': (150,150),
-        'share_square': (1080,1080),
-        'share_vertical': (1080,1350),
-        'share_horizontal': (1080,566)
-    },
-    'twitter': {
-        'profile': (200,200),
-        'cover': (1500,1500),
-        'share': (1024,512)
-    },
-    'google+': {
-        'profile': (250,250),
-        'cover': (968,545),
-        'share': (502,282)
-    },
-    'linkedin': {
-        'profile': (400,400),
-        'cover': (1584,396),
-        'posts': (520,320)
-    },
-    'pinterest': {
-        'profile': (165,165),
-        'pin': (236,450),
-        'board': (222,150)
-    }
-}
-
 def resize(event, context):
     payload = parse_qs(event['body'])
     payload = payload['payload'][0]
@@ -81,7 +44,7 @@ def resize(event, context):
         item = app_table.get_item(TableName=table_name, Key={'callback_id':payload['callback_id']})
         image_url = item['Item']['image_url']
         print("*** Post submission Image url : {}".format(image_url))
-        handle_submission(token, response_url, platform, channel_id, image_url)
+        handle_submission(token, response_url, platform, channel_id, image_url, payload['callback_id'])
 
     response = {
         "statusCode": 200,
@@ -89,33 +52,26 @@ def resize(event, context):
     }
     return response
 
-def handle_submission(token, post_url, platform, channel_id, image_url):
+def handle_submission(token, post_url, platform, channel_id, image_url, callback_id):
     print("***** Submission Accepted ******")
     send_ephemeral_message(token, post_url, "We will send the resized images soon..")
-    resize_helper(platform, channel_id, token, image_url)
+    resize_helper(platform, channel_id, token, image_url, callback_id)
 
 
-def resize_helper(platform, channel_id, token, image_url):
-    sns = boto3.resource('sns')
+def resize_helper(platform, channel_id, token, image_url, callback_id):
+    sns = boto3.client('sns')
     destination_bucket = os.environ['APP_BUCKET']
-    if platform == 'all':
-        print("Wowwwww!")
-    else:
-        data = IMAGE_SIZES[platform]
-        for img_type, size in data.items():
-            object_key = "shrek_{}_{}.jpeg".format(platform, img_type)
-            sns = boto3.client('sns')
-            params = {
-                "bucket": destination_bucket,
-                "object_key": object_key,
-                "platform": platform,
-                "channel_id": channel_id,
-                "size": size,
-                "token": token,
-                "image_url": image_url
-            }
-            topic_arn = os.environ['SNS_TOPIC_ARN']
-            sns.publish(TopicArn= topic_arn, Message= json.dumps(params))
+
+    params = {
+        "bucket": destination_bucket,
+        "platform": platform,
+        "channel_id": channel_id,
+        "token": token,
+        "image_url": image_url,
+        "callback_id": callback_id
+    }
+    topic_arn = os.environ['SNS_TOPIC_ARN']
+    sns.publish(TopicArn= topic_arn, Message= json.dumps(params))
 
 def make_item(data):
     if isinstance(data, dict):

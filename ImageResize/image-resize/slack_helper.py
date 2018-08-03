@@ -30,7 +30,7 @@ def post_to_slack(channel_id, token, destination_bucket, object_key):
         "attachments": [
             {
                 "fallback": "Required plain-text summary of the attachment.",
-                "title": object_key,
+                "title": object_key.split('/')[-1],
                 "title_link": "https://api.slack.com/",
                 "text": "",
                 "image_url": "https://s3.amazonaws.com/{}/{}".format(destination_bucket, object_key),
