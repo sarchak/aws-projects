@@ -8,6 +8,7 @@ import PIL
 from PIL import Image
 from io import BytesIO
 from slack_helper import post_to_slack
+import zipfile
 
 IMAGE_SIZES = {
     'facebook': {
@@ -47,6 +48,14 @@ IMAGE_SIZES = {
 }
 
 
+def zipdir(path, ziph):
+    # ziph is zipfile handle
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            print("Zip : {}, {}".format(root, file))
+            ziph.write(os.path.join(root, file), arcname=file)
+
+
 def image_resize_worker(event, context):
     pprint(event)
 
@@ -59,34 +68,39 @@ def image_resize_worker(event, context):
         token = payload["token"]
         platform = payload["platform"]
 
+        tmp_dir = "/tmp/{}".format(callback_id)
+        if not os.path.exists(tmp_dir):
+            os.mkdir(tmp_dir)
 
         headers = {
             'Authorization': 'Bearer {}'.format(token)
         }
 
-        data = IMAGE_SIZES[platform]
         r = requests.get(image_url, headers=headers)
         downloaded_image = Image.open(BytesIO(r.content))
-        for img_type, size in data.items():
-            object_key = "{}/{}_{}.jpeg".format(callback_id, platform, img_type)
+        s3 = boto3.resource('s3')
+        platforms = [platform]
+        if platform == "all":
+            platforms = IMAGE_SIZES.keys()
 
-            print("Resizing the image to : {} from url : {}".format(size, image_url))
-            s3 = boto3.resource('s3')
+        for platform in platforms:
+            data = IMAGE_SIZES[platform]
+            for img_type, size in data.items():
+                filepath = "{}/{}_{}.jpeg".format(tmp_dir, platform, img_type)
+                img = downloaded_image.resize(size, Image.ANTIALIAS)
+                img.save(filepath, 'JPEG', quality=100)
+                print(os.listdir(tmp_dir))
 
-            obj = s3.Object(
+        zipfile_name = '{}.zip'.format(callback_id)
+        zippath = '{}/{}'.format('/tmp', zipfile_name)
+        zipf = zipfile.ZipFile(zippath, 'w', zipfile.ZIP_DEFLATED)
+        zipdir(tmp_dir, zipf)
+        zipf.close()
+        obj = s3.Object(
                     bucket_name=destination_bucket,
-                    key=object_key,
+                    key=zipfile_name,
                 )
 
-            img = downloaded_image.resize(size, Image.ANTIALIAS)
-            buffer = BytesIO()
-            img.save(buffer, 'JPEG', quality=100)
-            buffer.seek(0)
-            obj.put(ACL='public-read', Body=buffer)
-            post_to_slack(channel_id, token, destination_bucket, object_key)
-
-            # Printing to CloudWatch
-            print('File saved at {}/{}'.format(
-                destination_bucket,
-                object_key,
-            ))
+        obj.put(ACL='public-read', Body=open(zippath, 'rb'))
+        post_to_slack(channel_id, token, destination_bucket, zipfile_name)
+        print('Zip file uploaded')
