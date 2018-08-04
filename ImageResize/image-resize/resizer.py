@@ -3,6 +3,7 @@ import requests
 from pprint import pprint
 import os
 import boto3
+import uuid
 from urllib.parse import urlsplit, parse_qs
 import PIL
 from PIL import Image
@@ -52,7 +53,6 @@ def zipdir(path, ziph):
     # ziph is zipfile handle
     for root, dirs, files in os.walk(path):
         for file in files:
-            print("Zip : {}, {}".format(root, file))
             ziph.write(os.path.join(root, file), arcname=file)
 
 
@@ -103,4 +103,31 @@ def image_resize_worker(event, context):
 
         obj.put(ACL='public-read', Body=open(zippath, 'rb'))
         post_to_slack(channel_id, token, destination_bucket, zipfile_name)
-        print('Zip file uploaded')
+        print('*** Zip file uploaded ***')
+
+def slash_resize(size, image_url, response_url):
+    destination_bucket = os.environ['APP_BUCKET']
+    filename = "{}.jpeg".format(str(uuid.uuid4()))
+    filepath = '/tmp/{}'.format(filename)
+    r = requests.get(image_url)
+    downloaded_image = Image.open(BytesIO(r.content))
+    s3 = boto3.resource('s3')
+    img = downloaded_image.resize(size, Image.ANTIALIAS)
+    img.save(filepath, 'JPEG', quality=100)
+    obj = s3.Object(
+                bucket_name=destination_bucket,
+                key='slash/{}'.format(filename),
+            )
+
+    obj.put(ACL='public-read', Body=open(filepath, 'rb'))
+    data = {
+        "text": "Download Image :https://s3.amazonaws.com/{}/slash/{}".format(destination_bucket, filename),
+        "attachments": [
+            {
+                "text":"Thank you for using ImageResize :pray:",
+                "image_url": "https://s3.amazonaws.com/{}/slash/{}".format(destination_bucket, filename),
+                "thumb_url": "https://s3.amazonaws.com/{}/slash/{}".format(destination_bucket, filename)
+            }
+        ]
+    }
+    requests.post(response_url, json=data)

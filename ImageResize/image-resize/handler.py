@@ -8,7 +8,29 @@ import PIL
 from PIL import Image
 from io import BytesIO
 from slack_helper import open_dialog, send_ephemeral_message
+from resizer import slash_resize
 import uuid
+
+def slash(event, context):
+    pprint(event)
+    pprint(context)
+    payload = parse_qs(event['body'])
+    pprint(payload)
+    response_url = payload['response_url'][0]
+    text = payload['text'][0]
+    text = text.replace(' ', ',')
+    values = text.split(',')
+    image_url = values[-1]
+    size = [int(x) for x in values[:-1] if len(x) > 0]
+    print("Size: ", size)
+    print("Image url : ", image_url)
+    slash_resize(size, image_url, response_url)
+    response = {
+        "statusCode": 200,
+        "body": ""
+    }
+    return response
+
 
 def resize(event, context):
     payload = parse_qs(event['body'])

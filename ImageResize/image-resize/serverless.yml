@@ -61,6 +61,12 @@ functions:
       - http:
           method: post
           path: slack/resize
+  slash:
+    handler: handler.slash
+    events:
+      - http:
+          method: post
+          path: slack/slash
   image_resize:
     handler: resizer.image_resize_worker
     events:
