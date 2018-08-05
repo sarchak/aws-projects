@@ -12,11 +12,9 @@ from resizer import slash_resize
 import uuid
 
 def slash(event, context):
-    pprint(event)
-    pprint(context)
     payload = parse_qs(event['body'])
-    pprint(payload)
     response_url = payload['response_url'][0]
+    team_id = payload['team_id'][0]
     text = payload['text'][0]
     text = text.replace(' ', ',')
     values = text.split(',')
@@ -24,7 +22,10 @@ def slash(event, context):
     size = [int(x) for x in values[:-1] if len(x) > 0]
     print("Size: ", size)
     print("Image url : ", image_url)
-    slash_resize(size, image_url, response_url)
+    if (''.join(values[:-1])) == 'help' or image_url == "help":
+        help(response_url)
+    else:
+        slash_resize(size, image_url, response_url, team_id)
     response = {
         "statusCode": 200,
         "body": ""
@@ -57,7 +58,7 @@ def resize(event, context):
     if(payload['type'] == 'message_action'):
         trigger_id = payload['trigger_id']
         callback_id = str(uuid.uuid4())
-        write_to_db({"callback_id": callback_id, "image_url": image_url}, table_name='CACHE_TABLE_NAME')
+        write_to_db({"callback_id": callback_id, "image_url": image_url, "team_id":payload['team']['id'], "channel_id": channel_id}, table_name='CACHE_TABLE_NAME')
         open_dialog(token, trigger_id, callback_id)
         print("*** Image url : {}".format(image_url))
     else:
@@ -66,7 +67,7 @@ def resize(event, context):
         item = app_table.get_item(TableName=table_name, Key={'callback_id':payload['callback_id']})
         image_url = item['Item']['image_url']
         print("*** Post submission Image url : {}".format(image_url))
-        handle_submission(token, response_url, platform, channel_id, image_url, payload['callback_id'])
+        handle_submission(token, response_url, platform, channel_id, image_url, payload['callback_id'], payload['team']['id'])
 
     response = {
         "statusCode": 200,
@@ -74,13 +75,34 @@ def resize(event, context):
     }
     return response
 
-def handle_submission(token, post_url, platform, channel_id, image_url, callback_id):
+def help(response_url):
+    data = {
+        "attachments": [
+            {
+                "color": "#36a64f",
+                "pretext": "How to use menu based triggers?",
+                "text": "You can trigger this action for any message which contains an image",
+                "image_url": "https://imageresize.xyz/images/feature.png",
+                "thumb_url": "https://imageresize.xyz/images/feature.png"
+            },
+            {
+                "color": "#36a64f",
+                "pretext": "How to use slash commands?",
+                "text": "/image-resize width height image_url"
+            }
+
+
+        ]
+    }
+    requests.post(response_url, json=data)
+
+def handle_submission(token, post_url, platform, channel_id, image_url, callback_id, team_id):
     print("***** Submission Accepted ******")
     send_ephemeral_message(token, post_url, "We will send the resized images soon..")
-    resize_helper(platform, channel_id, token, image_url, callback_id)
+    resize_helper(platform, channel_id, token, image_url, callback_id, team_id)
 
 
-def resize_helper(platform, channel_id, token, image_url, callback_id):
+def resize_helper(platform, channel_id, token, image_url, callback_id, team_id):
     sns = boto3.client('sns')
     destination_bucket = os.environ['APP_BUCKET']
 
@@ -90,7 +112,8 @@ def resize_helper(platform, channel_id, token, image_url, callback_id):
         "channel_id": channel_id,
         "token": token,
         "image_url": image_url,
-        "callback_id": callback_id
+        "callback_id": callback_id,
+        "team_id": team_id
     }
     topic_arn = os.environ['SNS_TOPIC_ARN']
     sns.publish(TopicArn= topic_arn, Message= json.dumps(params))
@@ -120,10 +143,11 @@ def authorization(event, context):
     clientId = os.environ['SLACK_CLIENT_ID']
     clientSecret = os.environ['SLACK_CLIENT_SECRET']
 
-    oauthURL = 'https://slack.com/api/oauth.access?' + 'client_id='+clientId + '&' + 'client_secret='+clientSecret + '&' + 'code='+code;
+    oauthURL = 'https://slack.com/api/oauth.access?'+'client_id='+clientId + '&' + 'client_secret='+clientSecret + '&' + 'code='+code;
 
     #Authorize Slack
     data = requests.post(oauthURL)
+    pprint(data.json())
     response = {
         "statusCode": 200,
         "body": "Successfully Authorized!"

@@ -4,6 +4,7 @@ provider:
   name: aws
   runtime: python3.6
   stage: dev
+  timeout: 30
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -33,6 +34,15 @@ provider:
           - Arn
     - Effect: "Allow"
       Action:
+        - "dynamodb:PutItem"
+        - "dynamodb:GetItem"
+        - "dynamodb:UpdateItem"
+      Resource:
+        Fn::GetAtt:
+          - metricsTable
+          - Arn
+    - Effect: "Allow"
+      Action:
         - "sns:Publish"
       Resource:
         - ${self:custom.snsWorkerTopicArn}
@@ -42,11 +52,13 @@ provider:
     SLACK_CLIENT_SECRET: ${file(../config/config.${self:provider.stage}.json):slack.CLIENT_SECRET}
     DYNAMODB_TABLE_NAME: ${self:custom.appTableName}
     CACHE_TABLE_NAME: ${self:custom.cacheTableName}
+    METRICS_TABLE_NAME: ${self:custom.metricsTableName}
     APP_BUCKET: ${self:custom.appBucketName}
     SNS_TOPIC_ARN: ${self:custom.snsWorkerTopicArn}
 
 plugins:
   - serverless-python-requirements
+  - serverless-domain-manager
 
 functions:
   authorization:
@@ -67,6 +79,12 @@ functions:
       - http:
           method: post
           path: slack/slash
+  help:
+    handler: handler.help
+    events:
+      - http:
+          method: post
+          path: slack/help
   image_resize:
     handler: resizer.image_resize_worker
     events:
@@ -81,6 +99,11 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: ${self:custom.appBucketName}
+        LifecycleConfiguration:
+          Rules:
+          -
+            ExpirationInDays: 1
+            Status: Enabled
     snsTopic:
       Type: AWS::SNS::Topic
       Properties:
@@ -112,6 +135,23 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
+    metricsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.metricsTableName}
+        AttributeDefinitions:
+          - AttributeName: team_id
+            AttributeType: S
+          - AttributeName: month
+            AttributeType: S
+        KeySchema:
+          - AttributeName: team_id
+            KeyType: HASH
+          - AttributeName: month
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
 
 custom:
   pythonRequirements:
@@ -119,6 +159,7 @@ custom:
   appTableName: ${file(../config/config.${self:provider.stage}.json):app.table_name}-${self:provider.stage}
   appBucketName: ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
   cacheTableName: ${file(../config/config.${self:provider.stage}.json):app.cache_table_name}-${self:provider.stage}
+  metricsTableName: ${file(../config/config.${self:provider.stage}.json):app.image_metrics_table_name}-${self:provider.stage}
   appBucketArn:
       Fn::Join:
         - ':'
@@ -138,3 +179,8 @@ custom:
         - Ref: AWS::Region
         - Ref: AWS::AccountId
         - ${self:custom.snsTopicName}
+  customDomain:
+    domainName: api.imageresize.xyz
+    basePath: ''
+    stage: ${self:provider.stage}
+    createRoute53Record: true

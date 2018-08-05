@@ -8,7 +8,7 @@ from functools import reduce
 import boto3
 
 """ Class for s3 buckets."""
-class BucketManager: 
+class BucketManager:
     """Manage an S3 Bucket."""
     CHUNK_SIZE = 8388608
     def __init__(self, session):
@@ -30,7 +30,7 @@ class BucketManager:
 
     def get_bucket_url(self, bucket):
         return "http://{}.{}".format(bucket.name, util.get_endpoint(self.get_region_name(bucket)).host)
-         
+
     def all_objects(self, bucket):
         """Get an iterator for all files"""
         return self.s3.Bucket(bucket).objects.all()
@@ -48,7 +48,7 @@ class BucketManager:
 
     def get_bucket(self, bucket_name):
         return self.s3.Bucket(bucket_name)
-        
+
     def set_policy(self, bucket):
         policy = """
         {
@@ -58,14 +58,14 @@ class BucketManager:
                     "Effect":"Allow",
                 "Principal": "*",
                 "Action":["s3:GetObject"],
-                "Resource":["arn:aws:s3:::%s/*"]               
+                "Resource":["arn:aws:s3:::%s/*"]
             }]
         }
         """ % bucket.name
         policy = policy.strip()
         pol = bucket.Policy()
         pol.put(Policy=policy)
-    
+
 
     def configure_website(self, bucket):
         ws = bucket.Website()
@@ -100,12 +100,12 @@ class BucketManager:
          paginator = self.s3.meta.client.get_paginator('list_objects_v2')
          for page in paginator.paginate(Bucket=bucket.name):
             for obj in page.get('Contents', []):
-                self.manifest[obj['Key']] = obj['ETag'] 
+                self.manifest[obj['Key']] = obj['ETag']
 
 
     def upload_file(self, bucket, path, key):
         """Upload path to s3 bucket at key."""
-        content_type = mimetypes.guess_type(key)[0] or 'text/plain'
+        content_type = mimetypes.guess_type(key)[0] or 'text/html'
         etag = self.gen_etag(path)
         if self.manifest.get(key, '') == etag:
             print("Skipping {}, etags match".format(key))

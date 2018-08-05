@@ -10,6 +10,7 @@ from PIL import Image
 from io import BytesIO
 from slack_helper import post_to_slack
 import zipfile
+import datetime
 
 IMAGE_SIZES = {
     'facebook': {
@@ -67,6 +68,7 @@ def image_resize_worker(event, context):
         image_url = payload["image_url"]
         token = payload["token"]
         platform = payload["platform"]
+        team_id = payload["team_id"]
 
         tmp_dir = "/tmp/{}".format(callback_id)
         if not os.path.exists(tmp_dir):
@@ -83,12 +85,16 @@ def image_resize_worker(event, context):
         if platform == "all":
             platforms = IMAGE_SIZES.keys()
 
+        print("PLATFORMS : ", platforms)
+        counter = 0
         for platform in platforms:
             data = IMAGE_SIZES[platform]
+            print("Processing for platform : {}".format(platform))
             for img_type, size in data.items():
                 filepath = "{}/{}_{}.jpeg".format(tmp_dir, platform, img_type)
                 img = downloaded_image.resize(size, Image.ANTIALIAS)
                 img.save(filepath, 'JPEG', quality=100)
+                counter += 1
                 print(os.listdir(tmp_dir))
 
         zipfile_name = '{}.zip'.format(callback_id)
@@ -104,8 +110,9 @@ def image_resize_worker(event, context):
         obj.put(ACL='public-read', Body=open(zippath, 'rb'))
         post_to_slack(channel_id, token, destination_bucket, zipfile_name)
         print('*** Zip file uploaded ***')
+        increment_counter(team_id, counter)
 
-def slash_resize(size, image_url, response_url):
+def slash_resize(size, image_url, response_url, team_id):
     destination_bucket = os.environ['APP_BUCKET']
     filename = "{}.jpeg".format(str(uuid.uuid4()))
     filepath = '/tmp/{}'.format(filename)
@@ -130,4 +137,40 @@ def slash_resize(size, image_url, response_url):
             }
         ]
     }
+
+    increment_counter(team_id, 1)
+
     requests.post(response_url, json=data)
+
+
+def make_item(data):
+    if isinstance(data, dict):
+        return { k: make_item(v) for k, v in data.items() }
+
+    if isinstance(data, list):
+        return [ make_item(v) for v in data ]
+
+    if isinstance(data, float):
+        return str(data)
+
+    return data
+
+
+def increment_counter(team_id, increment):
+    print("Increment counter")
+    dynamodb = boto3.resource('dynamodb')
+    table_name = os.environ['METRICS_TABLE_NAME']
+    metrics = dynamodb.Table(table_name)
+    metrics.update_item(
+        Key={
+            'team_id': team_id,
+            'month': datetime.datetime.now().strftime('%Y-%m')
+        },
+        UpdateExpression="SET processed_count = if_not_exists(processed_count, :start) + :inc",
+
+        ExpressionAttributeValues={
+            ':inc': increment,
+            ':start': 0,
+        },
+        ReturnValues="UPDATED_NEW"
+    )
