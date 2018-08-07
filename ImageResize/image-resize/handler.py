@@ -75,6 +75,16 @@ def resize(event, context):
     }
     return response
 
+def helpapi(event, context):
+    payload = parse_qs(event['body'])
+    response_url = payload['response_url'][0]
+    help(response_url)
+    response = {
+        "statusCode": 200,
+        "body": ""
+    }
+    return response
+
 def help(response_url):
     data = {
         "attachments": [
@@ -139,22 +149,34 @@ def write_to_db(data, table_name='DYNAMODB_TABLE_NAME'):
 
 
 def authorization(event, context):
-    code = event['queryStringParameters']['code'];
-    clientId = os.environ['SLACK_CLIENT_ID']
-    clientSecret = os.environ['SLACK_CLIENT_SECRET']
 
-    oauthURL = 'https://slack.com/api/oauth.access?'+'client_id='+clientId + '&' + 'client_secret='+clientSecret + '&' + 'code='+code;
+    if 'error' in event['queryStringParameters'] and event['queryStringParameters']['error'] == 'access_denied':
+        response = {
+            "statusCode": 301,
+            "body": "",
+            "headers": {
+                "Location": "https://imageresize.xyz/denied.html"
+            },
+        }
+        return response
 
-    #Authorize Slack
-    data = requests.post(oauthURL)
-    pprint(data.json())
-    response = {
-        "statusCode": 200,
-        "body": "Successfully Authorized!"
-    }
+    else:
+        code = event['queryStringParameters']['code'];
+        clientId = os.environ['SLACK_CLIENT_ID']
+        clientSecret = os.environ['SLACK_CLIENT_SECRET']
 
-    #Store team id and token
-    data = make_item(data.json())
-    write_to_db(data)
+        oauthURL = 'https://slack.com/api/oauth.access?'+'client_id='+clientId + '&' + 'client_secret='+clientSecret + '&' + 'code='+code;
 
-    return response
+        #Authorize Slack
+        data = requests.post(oauthURL)
+        #Store team id and token
+        data = make_item(data.json())
+        write_to_db(data)
+        response = {
+            "statusCode": 301,
+            "body": "",
+            "headers": {
+                "Location": "https://imageresize.xyz/thankyou.html"
+            },
+        }
+        return response

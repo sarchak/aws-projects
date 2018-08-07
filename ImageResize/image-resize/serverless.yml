@@ -3,7 +3,7 @@ service: image-resize
 provider:
   name: aws
   runtime: python3.6
-  stage: dev
+  stage: ${opt:stage, "dev"}
   timeout: 30
   iamRoleStatements:
     - Effect: "Allow"
@@ -60,6 +60,38 @@ plugins:
   - serverless-python-requirements
   - serverless-domain-manager
 
+custom:
+  pythonRequirements:
+    dockerizePip: true
+  appTableName: ${file(../config/config.${self:provider.stage}.json):app.table_name}-${self:provider.stage}
+  appBucketName: ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
+  cacheTableName: ${file(../config/config.${self:provider.stage}.json):app.cache_table_name}-${self:provider.stage}
+  metricsTableName: ${file(../config/config.${self:provider.stage}.json):app.image_metrics_table_name}-${self:provider.stage}
+  appBucketArn:
+      Fn::Join:
+        - ':'
+        - - arn
+          - aws
+          - s3
+          - ''
+          - ''
+          - ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
+  snsTopicName: sns-image-resize-topic-${self:provider.stage}
+  snsWorkerTopicArn:
+    Fn::Join:
+      - ":"
+      - - arn
+        - aws
+        - sns
+        - Ref: AWS::Region
+        - Ref: AWS::AccountId
+        - ${self:custom.snsTopicName}
+  customDomain:
+    domainName: api-${self:provider.stage}.imageresize.xyz
+    basePath: ''
+    stage: ${self:provider.stage}
+    createRoute53Record: true
+
 functions:
   authorization:
     handler: handler.authorization
@@ -79,8 +111,8 @@ functions:
       - http:
           method: post
           path: slack/slash
-  help:
-    handler: handler.help
+  helpapi:
+    handler: handler.helpapi
     events:
       - http:
           method: post
@@ -153,34 +185,3 @@ resources:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
 
-custom:
-  pythonRequirements:
-    dockerizePip: true
-  appTableName: ${file(../config/config.${self:provider.stage}.json):app.table_name}-${self:provider.stage}
-  appBucketName: ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
-  cacheTableName: ${file(../config/config.${self:provider.stage}.json):app.cache_table_name}-${self:provider.stage}
-  metricsTableName: ${file(../config/config.${self:provider.stage}.json):app.image_metrics_table_name}-${self:provider.stage}
-  appBucketArn:
-      Fn::Join:
-        - ':'
-        - - arn
-          - aws
-          - s3
-          - ''
-          - ''
-          - ${file(../config/config.${self:provider.stage}.json):app.bucket}-${self:provider.stage}
-  snsTopicName: sns-image-resize-topic-${self:provider.stage}
-  snsWorkerTopicArn:
-    Fn::Join:
-      - ":"
-      - - arn
-        - aws
-        - sns
-        - Ref: AWS::Region
-        - Ref: AWS::AccountId
-        - ${self:custom.snsTopicName}
-  customDomain:
-    domainName: api.imageresize.xyz
-    basePath: ''
-    stage: ${self:provider.stage}
-    createRoute53Record: true

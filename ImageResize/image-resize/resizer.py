@@ -91,9 +91,9 @@ def image_resize_worker(event, context):
             data = IMAGE_SIZES[platform]
             print("Processing for platform : {}".format(platform))
             for img_type, size in data.items():
-                filepath = "{}/{}_{}.jpeg".format(tmp_dir, platform, img_type)
+                filepath = "{}/{}_{}.{}".format(tmp_dir, platform, img_type, downloaded_image.format)
                 img = downloaded_image.resize(size, Image.ANTIALIAS)
-                img.save(filepath, 'JPEG', quality=100)
+                img.save(filepath, downloaded_image.format, quality=100)
                 counter += 1
                 print(os.listdir(tmp_dir))
 
@@ -114,13 +114,25 @@ def image_resize_worker(event, context):
 
 def slash_resize(size, image_url, response_url, team_id):
     destination_bucket = os.environ['APP_BUCKET']
-    filename = "{}.jpeg".format(str(uuid.uuid4()))
-    filepath = '/tmp/{}'.format(filename)
-    r = requests.get(image_url)
+    dynamodb = boto3.resource('dynamodb')
+    table_name = os.environ['DYNAMODB_TABLE_NAME']
+    app_table = dynamodb.Table(table_name)
+    item = app_table.get_item(TableName=table_name, Key={'team_id':team_id})
+    token = item['Item']['access_token']
+
+    headers = {
+            'Authorization': 'Bearer {}'.format(token)
+        }
+
+    r = requests.get(image_url, headers=headers)
     downloaded_image = Image.open(BytesIO(r.content))
     s3 = boto3.resource('s3')
     img = downloaded_image.resize(size, Image.ANTIALIAS)
-    img.save(filepath, 'JPEG', quality=100)
+
+    filename = "{}.{}".format(str(uuid.uuid4()), downloaded_image.format)
+    filepath = '/tmp/{}'.format(filename)
+
+    img.save(filepath, downloaded_image.format, quality=100)
     obj = s3.Object(
                 bucket_name=destination_bucket,
                 key='slash/{}'.format(filename),
