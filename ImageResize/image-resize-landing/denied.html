@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>ImageResize</title>
+    <meta charSet="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="Simple workflow for resizing images in slack">
+    <meta property="og:image" content="images/img_resize.png">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet">
+
+    <script>
+      (function(i, s, o, g, r, a, m)
+      {
+        i['GoogleAnalyticsObject'] = r;
+        i[r] = i[r] || function()
+        {
+          (i[r].q = i[r].q || []).push(arguments)
+        }, i[r].l = 1 * new Date();
+        a = s.createElement(o),
+          m = s.getElementsByTagName(o)[0];
+        a.async = 1;
+        a.src = g;
+        m.parentNode.insertBefore(a, m)
+      })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
+      ga('create', 'UA-118981901-4', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <link rel="stylesheet" href="css/AllTemplates.min.css">
+
+    <style>
+      .img-resize-promo {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        cursor: pointer;
+        width: 0;
+        height: 0;
+        z-index: 999999;
+      }
+
+      .img-resize-promo__active {
+        width: initial;
+        height: initial;
+      }
+
+      .img-resize-promo-speechbubble {
+        font-family: -apple-system, BlinkMacSystemFont, Roboto, "Open Sans", "Helvetica Neue", sans-serif;
+        position: absolute;
+        left: 50px;
+        top: -11px;
+        padding: 9px;
+        color: white;
+        border-radius: 3px;
+        background: linear-gradient(#227ef7, #1290fc);
+        font-size: 14px;
+        font-weight: 600;
+        width: 93px;
+        box-sizing: border-box;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease-in-out;
+      }
+
+      .img-resize-promo__active:hover .img-resize-promo-speechbubble {
+        opacity: 1;
+      }
+
+      .img-resize-promo svg {
+        transition: all .3s ease-in-out;
+        opacity: 0;
+      }
+
+      .img-resize-promo__active svg {
+        opacity: 1;
+      }
+
+      .img-resize-promo-speechbubble:before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        transform: rotate(45deg);
+        left: -4px;
+        bottom: 10px;
+        border-radius: 3px;
+        background: #1290fc;
+        z-index: 2;
+        position: absolute
+      }
+
+      .img-resize-promo__active .img-resize-promo-speechbubble__animate {
+        animation: popinpopup 3s linear forwards 0.1s;
+      }
+      .sad {
+          margin-bottom: 20px;
+      }
+      .btn {
+          background: #008952;
+          color: #fff;
+          transition: all 75ms ease-in-out;
+          line-height: 1.2rem;
+          font-weight: 700;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+          text-decoration: none;
+          cursor: pointer;
+          text-shadow: none;
+          border: none;
+          border-radius: .25rem;
+          box-shadow: none;
+          position: relative;
+          display: inline-block;
+          vertical-align: bottom;
+          text-align: center;
+          white-space: nowrap;
+          margin: 0;
+          margin-top: 20px;
+          padding: 20px;
+          -webkit-appearance: none;
+          -webkit-tap-highlight-color: transparent;
+      }
+
+      @keyframes popinpopup {
+        0% {
+          opacity: 0;
+          transform: translate3d(0, 3px, 0)
+        }
+        7%,
+        93% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0)
+        }
+        100% {
+          opacity: 0;
+          transform: translate3d(0, -4px, 0)
+        }
+      }
+
+      .img-resize-promo-animate:hover {
+        opacity: 1 !important;
+      }
+    </style>
+    <script>
+      "use strict";
+      ! function()
+      {
+        var t = window.driftt = window.drift = window.driftt || [];
+        if (!t.init)
+        {
+          if (t.invoked) return void(window.console && console.error && console.error("Drift snippet included twice."));
+          t.invoked = !0, t.methods = ["identify", "config", "track", "reset", "debug", "show", "ping", "page", "hide", "off", "on"], t.factory = function(e)
+          {
+            return function()
+            {
+              var i = Array.prototype.slice.call(arguments);
+              return i.unshift(e), t.push(i), t
+            }
+          }, t.methods.forEach(function(e)
+          {
+            t[e] = t.factory(e)
+          }), t.load = function(t)
+          {
+            var e = 3e5 * Math.ceil(new Date / 3e5),
+              i = document.createElement("script");
+            i.type = "text/javascript", i.async = !0, i.crossorigin = "anonymous", i.src = "https://js.driftt.com/include/" + e + "/" + t + ".js";
+            var n = document.getElementsByTagName("script")[0];
+            n.parentNode.insertBefore(i, n)
+          }
+        }
+      }(), drift.SNIPPET_VERSION = "0.3.1", drift.load("gcf9i6dc7ua4");
+    </script>
+    <script>
+      "use strict";
+      ! function()
+      {
+        var t = window.driftt = window.drift = window.driftt || [];
+        if (!t.init)
+        {
+          if (t.invoked) return void(window.console && console.error && console.error("Drift snippet included twice."));
+          t.invoked = !0, t.methods = ["identify", "config", "track", "reset", "debug", "show", "ping", "page", "hide", "off", "on"], t.factory = function(e)
+          {
+            return function()
+            {
+              var i = Array.prototype.slice.call(arguments);
+              return i.unshift(e), t.push(i), t
+            }
+          }, t.methods.forEach(function(e)
+          {
+            t[e] = t.factory(e)
+          }), t.load = function(t)
+          {
+            var e = 3e5 * Math.ceil(new Date / 3e5),
+              i = document.createElement("script");
+            i.type = "text/javascript", i.async = !0, i.crossorigin = "anonymous", i.src = "https://js.driftt.com/include/" + e + "/" + t + ".js";
+            var n = document.getElementsByTagName("script")[0];
+            n.parentNode.insertBefore(i, n)
+          }
+        }
+      }(), drift.SNIPPET_VERSION = "0.3.1", drift.load("gcf9i6dc7ua4");
+    </script>
+    <style>
+    </style>
+  </head>
+
+  <body class="font-friendly">
+    <div class="peach-gradient">
+      <!---->
+      <header class="header">
+        <div class="container-lrg">
+          <div class="flex col-12 spread">
+            <a class="logo primary-color img-resize-builder-hoverable logo" href='/'>ImageResize</a>
+            <a href="mailto:shrikar84@gmail.com" class="nav-link secondary-color mr0">Contact</a>
+          </div>
+        </div>
+      </header>
+      <section class="section">
+        <div class="container mb40">
+          <div class="col-12 text-center sad">
+            <h1 class="primary-color img-resize-builder-hoverable">Sorry to see you go without trying our app</h1>
+          </div>
+          <div class="col-12 text-center">
+            <img src="images/sad.gif" alt="Screenshot of application" class="custom-img">
+          </div>
+        </div>
+        <div class="container-lrg mt75">
+            <div class="col-12 text-center">
+                <h2 class="subheading secondary-color mt20 img-resize-builder-hoverable">It's never too late to try the app. Add to slack is right below</h2>
+                <div class="mt40">
+                <a href="https://slack.com/oauth/authorize?scope=commands,chat:write:bot,files:read&client_id=400597471637.406994228146"><img alt="Add to Slack" height="40" width="139" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x" /></a>
+                </div>
+              </div>
+        </div>
+      </section>
+    </div>
+    <footer id="footer-3" class="section text-center purple-white" sitemeta="[object Object]" activepage="Landing">
+      <div class="container col-12">
+        <nav class="mb50">
+          <a target="_blank" href="" class="nav-link secondary-color">©2018 ImageResize</a>
+          <a target="_blank" href="/terms" class="nav-link secondary-color">Terms</a>
+          <a target="_blank" href="/privacy" class="nav-link secondary-color">Privacy</a>
+        </nav>
+        <div>
+          <a href="https://twitter.com/shrikar84" target="_blank" class="socialicons accent-bg twitter"></a>
+          <!---->
+          <a href="mailto:shrikar84@gmail.com" class="socialicons accent-bg email"></a>
+        </div>
+        <!---->
+      </div>
+    </footer>
+
+  </body>
+
+</html>

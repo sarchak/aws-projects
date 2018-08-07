@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>ImageResize</title>
+    <meta charSet="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="description" content="Simple workflow for resizing images in slack">
+    <meta property="og:image" content="images/img_resize.png">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet">
+
+    <script>
+      (function(i, s, o, g, r, a, m)
+      {
+        i['GoogleAnalyticsObject'] = r;
+        i[r] = i[r] || function()
+        {
+          (i[r].q = i[r].q || []).push(arguments)
+        }, i[r].l = 1 * new Date();
+        a = s.createElement(o),
+          m = s.getElementsByTagName(o)[0];
+        a.async = 1;
+        a.src = g;
+        m.parentNode.insertBefore(a, m)
+      })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
+      ga('create', 'UA-118981901-4', 'auto');
+      ga('send', 'pageview');
+    </script>
+
+    <link rel="stylesheet" href="css/AllTemplates.min.css">
+
+    <style>
+      .img-resize-promo {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        cursor: pointer;
+        width: 0;
+        height: 0;
+        z-index: 999999;
+      }
+
+      .img-resize-promo__active {
+        width: initial;
+        height: initial;
+      }
+
+      .img-resize-promo-speechbubble {
+        font-family: -apple-system, BlinkMacSystemFont, Roboto, "Open Sans", "Helvetica Neue", sans-serif;
+        position: absolute;
+        left: 50px;
+        top: -11px;
+        padding: 9px;
+        color: white;
+        border-radius: 3px;
+        background: linear-gradient(#227ef7, #1290fc);
+        font-size: 14px;
+        font-weight: 600;
+        width: 93px;
+        box-sizing: border-box;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease-in-out;
+      }
+
+      .img-resize-promo__active:hover .img-resize-promo-speechbubble {
+        opacity: 1;
+      }
+
+      .img-resize-promo svg {
+        transition: all .3s ease-in-out;
+        opacity: 0;
+      }
+
+      .img-resize-promo__active svg {
+        opacity: 1;
+      }
+
+      .img-resize-promo-speechbubble:before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        transform: rotate(45deg);
+        left: -4px;
+        bottom: 10px;
+        border-radius: 3px;
+        background: #1290fc;
+        z-index: 2;
+        position: absolute
+      }
+
+      .img-resize-promo__active .img-resize-promo-speechbubble__animate {
+        animation: popinpopup 3s linear forwards 0.1s;
+      }
+
+      .btn {
+          background: #008952;
+          color: #fff;
+          transition: all 75ms ease-in-out;
+          line-height: 1.2rem;
+          font-weight: 700;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+          text-decoration: none;
+          cursor: pointer;
+          text-shadow: none;
+          border: none;
+          border-radius: .25rem;
+          box-shadow: none;
+          position: relative;
+          display: inline-block;
+          vertical-align: bottom;
+          text-align: center;
+          white-space: nowrap;
+          margin: 0;
+          margin-top: 20px;
+          padding: 20px;
+          -webkit-appearance: none;
+          -webkit-tap-highlight-color: transparent;
+      }
+
+      @keyframes popinpopup {
+        0% {
+          opacity: 0;
+          transform: translate3d(0, 3px, 0)
+        }
+        7%,
+        93% {
+          opacity: 1;
+          transform: translate3d(0, 0, 0)
+        }
+        100% {
+          opacity: 0;
+          transform: translate3d(0, -4px, 0)
+        }
+      }
+
+      .img-resize-promo-animate:hover {
+        opacity: 1 !important;
+      }
+    </style>
+    <script>
+      "use strict";
+      ! function()
+      {
+        var t = window.driftt = window.drift = window.driftt || [];
+        if (!t.init)
+        {
+          if (t.invoked) return void(window.console && console.error && console.error("Drift snippet included twice."));
+          t.invoked = !0, t.methods = ["identify", "config", "track", "reset", "debug", "show", "ping", "page", "hide", "off", "on"], t.factory = function(e)
+          {
+            return function()
+            {
+              var i = Array.prototype.slice.call(arguments);
+              return i.unshift(e), t.push(i), t
+            }
+          }, t.methods.forEach(function(e)
+          {
+            t[e] = t.factory(e)
+          }), t.load = function(t)
+          {
+            var e = 3e5 * Math.ceil(new Date / 3e5),
+              i = document.createElement("script");
+            i.type = "text/javascript", i.async = !0, i.crossorigin = "anonymous", i.src = "https://js.driftt.com/include/" + e + "/" + t + ".js";
+            var n = document.getElementsByTagName("script")[0];
+            n.parentNode.insertBefore(i, n)
+          }
+        }
+      }(), drift.SNIPPET_VERSION = "0.3.1", drift.load("gcf9i6dc7ua4");
+    </script>
+    <script>
+      "use strict";
+      ! function()
+      {
+        var t = window.driftt = window.drift = window.driftt || [];
+        if (!t.init)
+        {
+          if (t.invoked) return void(window.console && console.error && console.error("Drift snippet included twice."));
+          t.invoked = !0, t.methods = ["identify", "config", "track", "reset", "debug", "show", "ping", "page", "hide", "off", "on"], t.factory = function(e)
+          {
+            return function()
+            {
+              var i = Array.prototype.slice.call(arguments);
+              return i.unshift(e), t.push(i), t
+            }
+          }, t.methods.forEach(function(e)
+          {
+            t[e] = t.factory(e)
+          }), t.load = function(t)
+          {
+            var e = 3e5 * Math.ceil(new Date / 3e5),
+              i = document.createElement("script");
+            i.type = "text/javascript", i.async = !0, i.crossorigin = "anonymous", i.src = "https://js.driftt.com/include/" + e + "/" + t + ".js";
+            var n = document.getElementsByTagName("script")[0];
+            n.parentNode.insertBefore(i, n)
+          }
+        }
+      }(), drift.SNIPPET_VERSION = "0.3.1", drift.load("gcf9i6dc7ua4");
+    </script>
+    <style>
+    </style>
+  </head>
+
+  <body class="font-friendly">
+    <div class="peach-gradient">
+      <!---->
+      <header class="header">
+        <div class="container-lrg">
+          <div class="flex col-12 spread">
+            <a class="logo primary-color img-resize-builder-hoverable logo" href='/'>ImageResize</a>
+            <a href="mailto:shrikar84@gmail.com" class="nav-link secondary-color mr0">Contact</a>
+          </div>
+        </div>
+      </header>
+      <section class="section">
+        <div class="container mb40">
+          <div class="col-12 text-center">
+            <h1 class="heading-lrg primary-color img-resize-builder-hoverable">Thank you for installing ImageResize</h1>
+            <a href="slack://open" class="btn" target="_blank">Try ImageResize now</a>
+          </div>
+        </div>
+        <div class="container-lrg mt75">
+          <div class="col-12">
+            <div class="video img-resize-builder-hoverable">
+              <div class="youtube-responsive"></div>
+              <iframe src="https://www.youtube.com/embed/G4W4SUcvrfk?&amp;theme=dark&amp;color=white&amp;autohide=1&amp;modestbranding=1&amp;showinfo=0&amp;rel=0" frameborder="0" class="youtube-video"></iframe>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <section id="feature-1" class="section purple-white" sitemeta="[object Object]" activepage="Landing">
+      <div class="container-lrg flex">
+        <div class="col-4 text-center flex flex-column center-horizontal">
+          <i class="icon mobile-center-icon secondary-bg img-resize-builder-hoverable">
+            <svg class="svg-fill" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 25">
+              <path d="M17.727 20.628A1 1 0 0 0 16.8 20h-1.398l-.521-2.346a8.366 8.366 0 0 1-4.76 0L9.599 20H8.2a1 1 0 0 0-.929.628l-1.2 3A1 1 0 0 0 7.001 25h10.998a1 1 0 0 0 .928-1.372zM15.5 23h-6a.5.5 0 0 1 0-1h6a.5.5 0 0 1 0 1zM20 .5v9a7.5 7.5 0 0 1-15 0v-9a.5.5 0 0 1 .5-.5h14a.5.5 0 0 1 .5.5zm4 3V6a4.997 4.997 0 0 1-3 4.578V3h2.5a.5.5 0 0 1 .5.5zM1.5 3H4v7.578A4.997 4.997 0 0 1 1 6V3.5a.5.5 0 0 1 .5-.5z"></path>
+            </svg>
+          </i>
+          <h3 class="bold primary-color img-resize-builder-hoverable">Social Media Platforms</h3>
+          <p class="paragraph secondary-color img-resize-builder-hoverable">Get images ready to be uploaded on any platform like Facebook, Instagram, Twitter, LinkedIn, Pinterest etc</p>
+        </div>
+        <div class="col-4 text-center flex flex-column center-horizontal">
+          <i class="icon mobile-center-icon secondary-bg img-resize-builder-hoverable">
+            <svg class="svg-fill" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 25">
+              <path d="M20 22.494v1a.5.5 0 0 1-1 0v-1a.5.5 0 1 1 1 0zm-14.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 1 0v-1a.5.5 0 0 0-.5-.5zm7 1a10.924 10.924 0 0 1-2.494-.391l-.27 1.76a.528.528 0 0 0 .097.454.498.498 0 0 0 .387.183h4.56a.5.5 0 0 0 .49-.598l-.275-1.8a10.928 10.928 0 0 1-2.495.392zm9.06-7.44L18 11.995v9h2.5a1.5 1.5 0 0 0 1.5-1.5v-2.879a1.5 1.5 0 0 0-.44-1.06zM17 5.995v15a18.472 18.472 0 0 1-4 .974v-7.474a.5.5 0 0 0-1 0v7.474a18.47 18.47 0 0 1-4-.974v-15C8 3.67 11.553.244 12.5 0c.947.244 4.5 3.67 4.5 5.994zm-2.168 1.127A4.374 4.374 0 0 0 12.5 5.994a4.113 4.113 0 0 0-2.343 1.136.5.5 0 0 0 .686.729 3.213 3.213 0 0 1 1.657-.865 3.417 3.417 0 0 1 1.668.874.5.5 0 0 0 .664-.748zM3 16.614v2.88a1.5 1.5 0 0 0 1.5 1.5H7v-9l-3.56 3.56a1.5 1.5 0 0 0-.44 1.06z"></path>
+            </svg>
+          </i>
+          <h3 class="bold primary-color img-resize-builder-hoverable">Interactive Menu</h3>
+          <p class="paragraph secondary-color img-resize-builder-hoverable">Trigger interactive menu from any message that contains an image. </p>
+        </div>
+        <div class="col-4 text-center flex flex-column center-horizontal">
+          <i class="icon mobile-center-icon secondary-bg img-resize-builder-hoverable">
+            <svg class="svg-fill" viewBox="0 0 8 15" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7.75 7.46c.247.117.305.378.12.593l-5.633 6.602c-.143.168-.209.123-.15-.087l1.395-5.034.03-.111a.373.373 0 0 0-.194-.425l-.103-.05-2.969-1.41C0 7.421-.06 7.16.122 6.944L5.694.327c.142-.169.21-.124.154.087L4.516 5.473l-.028.11a.374.374 0 0 0 .195.42l.102.049L7.75 7.46z"></path>
+            </svg>
+          </i>
+          <h3 class="bold primary-color img-resize-builder-hoverable">Easy to use</h3>
+          <p class="paragraph secondary-color img-resize-builder-hoverable">You can also use this app to resize to any custom size you want using the /slash commands</p>
+        </div>
+      </div>
+      <div class="container-lrg mt75">
+        <div class="col-12 img-resize-builder-hoverable">
+          <div class="">
+            <img src="images/feature.png" alt="Screenshot of application" class="custom-img">
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="faq-2" class="section peach-accent" sitemeta="[object Object]" activepage="Landing">
+      <div class="container">
+        <div class="col-12 text-center">
+          <h3 class="heading primary-color img-resize-builder-hoverable">
+            Frequently Asked Questions
+          </h3>
+          <p class="subheading secondary-color mt20 img-resize-builder-hoverable">Can't find an answer? Don't hesitate to reach out!.</p>
+        </div>
+      </div>
+      <div class="container">
+        <div class="col-12 mt40">
+          <div class="faq pad20">
+            <b class="bold primary-color img-resize-builder-hoverable">
+              When I select Facebook what image sizes are generated?
+            </b>
+            <p class="paragraph secondary-color img-resize-builder-hoverable">
+              For Facebook we generate size for posts, profile, group, event and pages.
+            </p>
+          </div>
+          <div class="faq pad20">
+            <b class="bold primary-color img-resize-builder-hoverable">
+              How much time does it take to resize?
+            </b>
+            <p class="paragraph secondary-color img-resize-builder-hoverable">
+              Resize operation should happen within 2 to 5 seconds.
+            </p>
+          </div>
+          <div class="faq pad20">
+            <b class="bold primary-color img-resize-builder-hoverable">
+              Can I request for more features?
+            </b>
+            <p class="paragraph secondary-color img-resize-builder-hoverable">
+              Sure. Just shoot me an email
+            </p>
+          </div>
+          <div class="faq pad20">
+            <b class="bold primary-color img-resize-builder-hoverable">
+              What is the format for slash command
+            </b>
+            <p class="paragraph secondary-color img-resize-builder-hoverable">
+              /image-resize width height image_url
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <footer id="footer-3" class="section text-center purple-white" sitemeta="[object Object]" activepage="Landing">
+      <div class="container col-12">
+        <nav class="mb50">
+          <a target="_blank" href="" class="nav-link secondary-color">©2018 ImageResize</a>
+          <a target="_blank" href="/terms" class="nav-link secondary-color">Terms</a>
+          <a target="_blank" href="/privacy" class="nav-link secondary-color">Privacy</a>
+        </nav>
+        <div>
+          <a href="https://twitter.com/shrikar84" target="_blank" class="socialicons accent-bg twitter"></a>
+          <!---->
+          <a href="mailto:shrikar84@gmail.com" class="socialicons accent-bg email"></a>
+        </div>
+        <!---->
+      </div>
+    </footer>
+
+  </body>
+
+</html>
