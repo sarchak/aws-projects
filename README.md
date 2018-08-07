@@ -18,7 +18,7 @@ This project will help us to upload a local directory to s3 bucket and configure
 This is a simple slack app which will help you simplify you image resize workflow without ever leaving slack. The app is built in Serverless framework
 so even got a chance to learn that framework and start using it.
 
-Demo : ![https://imageresize.xyz](Image Resize App)
+Demo : https://imageresize.xyz
 
 #### Features
 
